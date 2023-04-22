@@ -1,0 +1,77 @@
+## 실전 프로젝트 2023.03.10-04.21
+
+<br />
+
+## 4/7(금)
+
+- Intersection Observer API
+  - 감시하고자 하는 요소가 다른 요소(viewport)에 들어가거나 나갈 때 또는 요청한 부분만큼 두 요소의 교차 부분이 변경될 때마다 실행될 콜백 함수를 등록할 수 있다. 즉, 사이트는 요소의 교차를 지켜보기 위해 메인 스레드를 사용할 필요가 없어지고 브라우저는 원하는 대로 교차 영역 관리를 최적화 할 수 있다.
+  - 정확히 몇 픽셀이 겹쳐졌고 어떠한 픽셀이 겹쳐졌는지 Intersection Observer API가 알려줄 수 없지만 “N% 정도 교차하는 경우 상호작용이 이루어져야 한다.” 와 같은 더 일반적인 사용 사례를 다룰 수 있다.
+  - 대상(target)으로 칭하는 요소가 기기 뷰포트나 특정 요소(이 API에서는 root)와 교차할 때, observer가 최초로 타겟을 관측하도록 요청받을 때마다 호출되는 콜백을 생성하는 기능을 제공한다.
+  ```jsx
+  const opstions = {
+    root: null, // document의 루트 요소를 기준으로 해당 요소를 관측하기 위해서 null로 설정
+    rootMargin: "0px",
+    threshold: 1.0, // 대상 요소가 root에 지정된 요소 내에서 100% 보여질 때 콜백이 호출될 것을 의미
+  };
+
+  const callback = (entries: IntersectionObserverEntry[]) => {
+    const target = entries[0];
+    if (target.isIntersecting) setIndex((prev) => prev + 1);
+  };
+
+  const observer = new IntersectionObserver(callback, options);
+  ```
+  - root와 대상 요소가 교차하는 정도를 Intersection ratio라고 한다. (0.0 ~ 1.0의 숫자로 표현한다)
+  - `root` : 대상 객체의 가시성을 확인할 때 사용되는 viewport 요소이다.
+  - `rootMargin` : root가 가진 margin이다.
+  - `threshold` : observer의 콜백이 실행될 대상 요소의 가시성 퍼센티지를 나타내는 단일 숫자 혹은 숫자 배열이다. 50%만큼 요소가 보여졌을 때를 탐지하고 싶다면, 값을 0.5로 설정하면 된다. 1.0은 요소의 모든 픽셀이 화면에 노출되기 전에는 콜백을 실행시키지 않음을 의미한다.
+- IntersectionObserverEntry객체 속성
+  - `intersecting` : 타겟 요소가 교차 영역에 있는 동안에는 `true` , 아니면 `false` 를 반환한다. 이 속성을 사용하기 위해서는 `threshold` 속성에 0을 포함시켜야 정상적으로 동작한다.
+  - `target` : 타겟 요소 자체를 반환한다.
+  - `time` : 교차가 발생한 시간을 반환한다.
+- 추가 메서드
+  - `observer.unobserve()` : 타겟 요소에 대한 관찰을 멈추고 싶은 경우에 사용한다. `observer.disconnect()` 와는 그 의미가 다르다. 예를 들어, `lazy loading` 에서 이미 요소가 로딩이 끝났다면 더 이상 해당 요소에 관측을 유지할 필요가 없으므로 이를 해제할 수 있다.
+
+## 4/8(토)
+
+- 앱 메인페이지 스크롤
+  - 오른쪽 인박스에 마우스를 올리면 스크롤이 나왔다 들어갔다 하면서 화면이 울렁거림
+  - 해결 방안
+    - 스크롤 크기만큼 오른쪽 박스를 나오게 하기?
+    - 스크롤바 display : none; → 화면크기를 줄였을 때 같은 이슈 생김(화면 왔다갔다)
+- RightSideBox
+  - 사람 목록 배열이 변경되거나, status가 바꼈을 때 useEffect대신 useCallback을 사용하는 것이 렌더링을 줄일 수 있는 방법인가?? → 실시간으로 상태가 바뀌는 것을 받아올 때 콘솔을 찍어서 렌더링 되는 횟수 확인하기
+- 무한스크롤
+  - target에 닿았을 때 요청을 하고나서 스크롤이 가장 아래로 내려오는 오류
+  - 시도
+    - prevScrollHeight state를 생성하고 이전 scrollHeight를 저장해둔 뒤 scrollIndex값이 변했을 때 scrollTop의 값을 `scrollHeight - prevScrollHeight` 로 줬다.
+  - 결과
+    - 동기적으로 실행이 되는 것을 파악하지 못해서인지 scrollTop이 0으로 지정되어서 데이터를 받아오고 scrollHeight가 증가했을 때 가장 위로 올라간다. 이전 스크롤 위치로 고정해야하는데 스크롤이 가장 위로 올라간다.
+  - 시도
+    - 이전 메시지를 받아왔을 때 scrollHeight가 변하기 때문에 dependency array에 prevMessages를 넣고 scrollTop을 `scrollRef.current.scrollHeight - prevScrollHeight` 로 줬다.
+    ```jsx
+    useEffect(() => {
+      console.log("scroll index : ", scrollIndex);
+      if (scrollIndex === -1) return;
+      if (scrollRef.current?.scrollHeight)
+        setPrevScrollHeight(scrollRef.current.scrollHeight);
+
+      getPrevMessages(workspaceId, Number(userId), scrollIndex)
+        .then((res) => {
+          console.log("response data: ", res);
+          if (res.length === 0) return;
+          setPrevMessages((prev: any) => [...res, ...prev]);
+        })
+        .catch((error) => console.log(error));
+    }, [scrollIndex]);
+
+    useEffect(() => {
+      if (scrollRef.current?.scrollHeight)
+        scrollRef.current.scrollTop =
+          scrollRef.current.scrollHeight - prevScrollHeight;
+    }, [prevMessages]);
+    ```
+    - 스크롤을 끝까지 올렸을 때 요청하게 되면 끊기는 느낌이 들어서 target 박스 스타일을 128px 아래로 고정시켰다.
+  - 결과
+    - 이전 메시지를 받아와서 scrollHeight가 커져도 스크롤 위치가 잘 고정된다.
